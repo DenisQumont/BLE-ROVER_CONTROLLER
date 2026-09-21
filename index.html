@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="icons/icon-192.png">
+    <title>MYO Rover</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            padding: 16px;
+            max-width: 600px;
+            margin: auto;
+            background: #f0f4f8;
+            color: #1e293b;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        h1 {
+            font-size: 1.6rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        button {
+            font-size: 1.1rem;
+            padding: 12px 20px;
+            margin: 6px 4px;
+            border: none;
+            border-radius: 10px;
+            background: #3b82f6;
+            color: white;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 14px rgba(0,0,0,0.15);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #status {
+            margin: 12px 0;
+            padding: 10px 14px;
+            background: #e2e8f0;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+
+        .info-block {
+            background: white;
+            padding: 18px 20px;
+            border-radius: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            margin-top: 18px;
+        }
+
+        .info-block h3 {
+            margin-top: 0;
+            margin-bottom: 12px;
+            font-weight: 600;
+            color: #0f172a;
+        }
+
+        .info-block p {
+            margin: 8px 0;
+        }
+
+        .battery {
+            font-weight: bold;
+            color: #22c55e;
+        }
+
+        .hint {
+            font-size: 0.9rem;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        #stopBtn {
+            background: #ef4444;
+        }
+
+        #disconnectBtn {
+            background: #64748b;
+        }
+
+        .motors {
+            display: flex;
+            justify-content: space-around;
+            align-items: stretch;
+            gap: 16px;
+            margin-top: 8px;
+        }
+
+        .motor-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .motor-col label {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .motor-value {
+            font-variant-numeric: tabular-nums;
+            font-weight: 700;
+            min-width: 4ch;
+            text-align: center;
+        }
+
+        .motor-slider {
+            writing-mode: vertical-lr;
+            direction: rtl;
+            height: 240px;
+            width: 48px;
+            accent-color: #3b82f6;
+            touch-action: none;
+        }
+
+        .motor-scale {
+            font-size: 0.8rem;
+            color: #64748b;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 240px;
+        }
+
+        details {
+            margin-top: 12px;
+            cursor: pointer;
+        }
+
+        details summary {
+            font-weight: 600;
+            color: #3b82f6;
+            padding: 6px 0;
+            font-size: 1.05rem;
+        }
+
+        .manual {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 16px 20px;
+            border-left: 4px solid #3b82f6;
+            margin: 8px 0;
+        }
+
+        .manual p, .manual ul {
+            margin: 8px 0;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 500px) {
+            button {
+                width: 100%;
+                margin: 4px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Управление MYO Rover</h1>
+
+    <div class="actions">
+        <button id="connectBtn">Подключить</button>
+        <button id="stopBtn" disabled>Стоп</button>
+        <button id="disconnectBtn" disabled>Отключить</button>
+    </div>
+
+    <div id="status">Статус: не подключено</div>
+
+    <div class="info-block">
+        <h3>Уровень заряда батареи</h3>
+        <p><span class="battery" id="battery-level">—</span>%</p>
+        <p class="hint">Датчик напряжения на ровере пока не установлен — значение может быть недоступно.</p>
+    </div>
+
+    <div class="info-block">
+        <h3>Моторы гусениц</h3>
+        <p class="hint">Каждый ползунок задаёт направление и скорость от −100 до 100. По центру — стоп мотора.</p>
+        <div class="motors">
+            <div class="motor-col">
+                <label for="m1Slider">M1</label>
+                <span class="motor-value" id="m1Value">0</span>
+                <input type="range" id="m1Slider" class="motor-slider" min="-100" max="100" value="0" step="1" disabled>
+            </div>
+            <div class="motor-col">
+                <label for="m2Slider">M2</label>
+                <span class="motor-value" id="m2Value">0</span>
+                <input type="range" id="m2Slider" class="motor-slider" min="-100" max="100" value="0" step="1" disabled>
+            </div>
+        </div>
+    </div>
+
+    <details>
+        <summary>Инструкция</summary>
+        <div class="manual">
+            <p>Подключите ровер по Bluetooth (имя вида MYO_ROVER-xx).</p>
+            <p>Два независимых ползунка управляют моторами гусениц M1 и M2. Приложение непрерывно отправляет 2 байта int8 (−100…100) в характеристику управления.</p>
+            <p>Кнопка «Стоп» обнуляет оба мотора. При скрытии вкладки или обрыве связи также отправляется стоп.</p>
+        </div>
+    </details>
+
+    <details>
+        <summary>Информация об устройстве</summary>
+        <div class="info-block">
+            <p><b>Производитель:</b> <span id="manufacturer">—</span></p>
+            <p><b>Серийный номер:</b> <span id="serial">—</span></p>
+            <p><b>Версия прошивки:</b> <span id="firmware">—</span></p>
+            <p><b>Версия железа:</b> <span id="hardware">—</span></p>
+            <p><b>Версия ПО:</b> <span id="software">—</span></p>
+        </div>
+    </details>
+
+    <script src="script.js"></script>
+</body>
+</html>
