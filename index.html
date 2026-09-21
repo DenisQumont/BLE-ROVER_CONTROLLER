@@ -168,10 +168,13 @@
             pointer-events: none;
         }
 
-        #txStatus {
-            font-size: 0.9rem;
-            color: #64748b;
-            margin-top: 10px;
+        .legacy-slider {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            opacity: 0;
+            pointer-events: none;
         }
 
         details {
@@ -246,6 +249,8 @@
                 </div>
             </div>
         </div>
+        <input type="range" id="m1Slider" min="-100" max="100" value="0" aria-hidden="true" tabindex="-1" class="legacy-slider">
+        <input type="range" id="m2Slider" min="-100" max="100" value="0" aria-hidden="true" tabindex="-1" class="legacy-slider">
     </div>
 
     <details>
@@ -268,6 +273,6 @@
         </div>
     </details>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=4"></script>
 </body>
 </html>

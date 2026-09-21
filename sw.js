@@ -1,9 +1,10 @@
-const CACHE_VERSION = 'v3-rover';
+const CACHE_VERSION = 'v4-rover';
 const CACHE_NAME = `myo-rover-cache-${CACHE_VERSION}`;
 const urlsToCache = [
     './',
     './index.html',
     './script.js',
+    './script.js?v=4',
     './manifest.json'
 ];
 
@@ -28,8 +29,12 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
     event.respondWith(
-        caches.match(event.request)
-            .then(response => response || fetch(event.request))
-            .catch(() => new Response('Offline', { status: 503 }))
+        fetch(event.request).then(response => {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+            return response;
+        }).catch(() => caches.match(event.request).then(response => {
+            return response || new Response('Offline', { status: 503 });
+        }))
     );
 });
