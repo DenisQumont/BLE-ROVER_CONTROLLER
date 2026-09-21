@@ -130,22 +130,48 @@
             text-align: center;
         }
 
-        .motor-slider {
-            writing-mode: vertical-lr;
-            direction: rtl;
+        .stick {
+            width: 72px;
             height: 240px;
-            width: 48px;
-            accent-color: #3b82f6;
+            background: #e2e8f0;
+            border-radius: 36px;
+            position: relative;
             touch-action: none;
+            cursor: pointer;
         }
 
-        .motor-scale {
-            font-size: 0.8rem;
+        .stick.disabled {
+            opacity: 0.45;
+            pointer-events: none;
+        }
+
+        .stick-center {
+            position: absolute;
+            left: 12px;
+            right: 12px;
+            top: 50%;
+            height: 2px;
+            background: #94a3b8;
+            transform: translateY(-1px);
+        }
+
+        .stick-thumb {
+            position: absolute;
+            left: 8px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #3b82f6;
+            box-shadow: 0 2px 8px rgba(59,130,246,0.45);
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+        }
+
+        #txStatus {
+            font-size: 0.9rem;
             color: #64748b;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            height: 240px;
+            margin-top: 10px;
         }
 
         details {
@@ -191,6 +217,7 @@
     </div>
 
     <div id="status">Статус: не подключено</div>
+    <div id="txStatus">Отправка: нет соединения</div>
 
     <div class="info-block">
         <h3>Уровень заряда батареи</h3>
@@ -200,17 +227,23 @@
 
     <div class="info-block">
         <h3>Моторы гусениц</h3>
-        <p class="hint">Каждый ползунок задаёт направление и скорость от −100 до 100. По центру — стоп мотора.</p>
+        <p class="hint">Каждый ползунок задаёт направление и скорость от −100 до 100. После отпускания этот мотор сбрасывается в 0.</p>
         <div class="motors">
             <div class="motor-col">
-                <label for="m1Slider">M1</label>
+                <label>M1</label>
                 <span class="motor-value" id="m1Value">0</span>
-                <input type="range" id="m1Slider" class="motor-slider" min="-100" max="100" value="0" step="1" disabled>
+                <div class="stick disabled" id="m1Stick" data-motor="m1">
+                    <div class="stick-center"></div>
+                    <div class="stick-thumb" id="m1Thumb"></div>
+                </div>
             </div>
             <div class="motor-col">
-                <label for="m2Slider">M2</label>
+                <label>M2</label>
                 <span class="motor-value" id="m2Value">0</span>
-                <input type="range" id="m2Slider" class="motor-slider" min="-100" max="100" value="0" step="1" disabled>
+                <div class="stick disabled" id="m2Stick" data-motor="m2">
+                    <div class="stick-center"></div>
+                    <div class="stick-thumb" id="m2Thumb"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -219,7 +252,7 @@
         <summary>Инструкция</summary>
         <div class="manual">
             <p>Подключите ровер по Bluetooth (имя вида MYO_ROVER-xx).</p>
-            <p>Два независимых ползунка управляют моторами гусениц M1 и M2. Приложение непрерывно отправляет 2 байта int8 (−100…100) в характеристику управления.</p>
+            <p>Два независимых ползунка управляют моторами гусениц M1 и M2. Пока ползунок удерживается, в характеристику уходят 2 байта int8 (−100…100). После отпускания этот мотор сбрасывается в 0, второй при этом не трогается.</p>
             <p>Кнопка «Стоп» обнуляет оба мотора. При скрытии вкладки или обрыве связи также отправляется стоп.</p>
         </div>
     </details>

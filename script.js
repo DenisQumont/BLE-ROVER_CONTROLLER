@@ -19,6 +19,7 @@ const SERIAL_NUMBER_RESERVE_SERVICE = '0000ffe1-0000-1000-8000-00805f9b34fb';
 const SERIAL_NUMBER_RESERVE_CHARACTERISTIC = '0000ffe2-0000-1000-8000-00805f9b34fb';
 
 const SEND_INTERVAL_MS = 80;
+const STICK_THUMB_SIZE = 56;
 
 let device = null;
 let server = null;
@@ -26,6 +27,7 @@ let inputCharacteristic = null;
 let sendTimer = null;
 let writeInFlight = false;
 let pendingPayload = null;
+let txCount = 0;
 
 let m1 = 0;
 let m2 = 0;
@@ -34,16 +36,21 @@ const connectBtn = document.getElementById('connectBtn');
 const stopBtn = document.getElementById('stopBtn');
 const disconnectBtn = document.getElementById('disconnectBtn');
 const statusDiv = document.getElementById('status');
-const m1Slider = document.getElementById('m1Slider');
-const m2Slider = document.getElementById('m2Slider');
+const txStatus = document.getElementById('txStatus');
+const m1Stick = document.getElementById('m1Stick');
+const m2Stick = document.getElementById('m2Stick');
+const m1Thumb = document.getElementById('m1Thumb');
+const m2Thumb = document.getElementById('m2Thumb');
 const m1Value = document.getElementById('m1Value');
 const m2Value = document.getElementById('m2Value');
 
 connectBtn.addEventListener('click', connectDevice);
 stopBtn.addEventListener('click', stopMotors);
 disconnectBtn.addEventListener('click', disconnectDevice);
-m1Slider.addEventListener('input', () => onSliderChange('m1', m1Slider, m1Value));
-m2Slider.addEventListener('input', () => onSliderChange('m2', m2Slider, m2Value));
+
+bindStick(m1Stick, 'm1');
+bindStick(m2Stick, 'm2');
+updateStickUi();
 
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
@@ -55,16 +62,6 @@ window.addEventListener('pagehide', () => {
     stopMotors();
 });
 
-function onSliderChange(motor, slider, label) {
-    const value = clampMotor(slider.value);
-    if (motor === 'm1') {
-        m1 = value;
-    } else {
-        m2 = value;
-    }
-    label.textContent = String(value);
-}
-
 function clampMotor(value) {
     const n = Number.parseInt(value, 10);
     if (Number.isNaN(n)) {
@@ -73,9 +70,84 @@ function clampMotor(value) {
     return Math.max(-100, Math.min(100, n));
 }
 
+function motorPayload(left, right) {
+    return new Uint8Array([clampMotor(left) & 0xFF, clampMotor(right) & 0xFF]);
+}
+
+function bindStick(el, motor) {
+    const onPointer = (event) => {
+        if (el.classList.contains('disabled')) {
+            return;
+        }
+        event.preventDefault();
+        setMotorFromPointer(el, motor, event.clientY);
+    };
+
+    const release = (event) => {
+        if (event && el.hasPointerCapture(event.pointerId)) {
+            el.releasePointerCapture(event.pointerId);
+        }
+        resetMotor(motor);
+    };
+
+    el.addEventListener('pointerdown', (event) => {
+        if (el.classList.contains('disabled')) {
+            return;
+        }
+        el.setPointerCapture(event.pointerId);
+        onPointer(event);
+    });
+    el.addEventListener('pointermove', (event) => {
+        if (!el.hasPointerCapture(event.pointerId)) {
+            return;
+        }
+        onPointer(event);
+    });
+    el.addEventListener('pointerup', release);
+    el.addEventListener('pointercancel', release);
+    el.addEventListener('lostpointercapture', () => resetMotor(motor));
+}
+
+function resetMotor(motor) {
+    if (motor === 'm1') {
+        m1 = 0;
+    } else {
+        m2 = 0;
+    }
+    updateStickUi();
+    sendMotorCommand(m1, m2);
+}
+
+function setMotorFromPointer(el, motor, clientY) {
+    const rect = el.getBoundingClientRect();
+    const ratio = (clientY - rect.top) / rect.height;
+    const value = clampMotor(Math.round((0.5 - ratio) * 200));
+    if (motor === 'm1') {
+        m1 = value;
+    } else {
+        m2 = value;
+    }
+    updateStickUi();
+    sendMotorCommand(m1, m2);
+}
+
+function updateStickUi() {
+    m1Value.textContent = String(m1);
+    m2Value.textContent = String(m2);
+    positionThumb(m1Stick, m1Thumb, m1);
+    positionThumb(m2Stick, m2Thumb, m2);
+}
+
+function positionThumb(stick, thumb, value) {
+    const travel = stick.clientHeight - STICK_THUMB_SIZE;
+    const top = ((100 - value) / 200) * travel;
+    thumb.style.top = `${top}px`;
+    thumb.style.transform = 'none';
+}
+
 function setControlsEnabled(enabled) {
-    m1Slider.disabled = !enabled;
-    m2Slider.disabled = !enabled;
+    m1Stick.classList.toggle('disabled', !enabled);
+    m2Stick.classList.toggle('disabled', !enabled);
     stopBtn.disabled = !enabled;
     disconnectBtn.disabled = !enabled;
     connectBtn.disabled = enabled;
@@ -84,10 +156,7 @@ function setControlsEnabled(enabled) {
 function resetMotorUi() {
     m1 = 0;
     m2 = 0;
-    m1Slider.value = '0';
-    m2Slider.value = '0';
-    m1Value.textContent = '0';
-    m2Value.textContent = '0';
+    updateStickUi();
 }
 
 function stopMotors() {
@@ -111,8 +180,9 @@ function stopSendLoop() {
 }
 
 async function sendMotorCommand(left, right) {
-    const payload = new Int8Array([clampMotor(left), clampMotor(right)]);
+    const payload = motorPayload(left, right);
     if (!inputCharacteristic) {
+        txStatus.textContent = 'Отправка: нет характеристики управления';
         return;
     }
     if (writeInFlight) {
@@ -122,20 +192,33 @@ async function sendMotorCommand(left, right) {
 
     writeInFlight = true;
     try {
-        if (inputCharacteristic.properties.writeWithoutResponse) {
+        if (inputCharacteristic.properties.write) {
+            if (typeof inputCharacteristic.writeValueWithResponse === 'function') {
+                await inputCharacteristic.writeValueWithResponse(payload);
+            } else {
+                await inputCharacteristic.writeValue(payload);
+            }
+        } else if (inputCharacteristic.properties.writeWithoutResponse) {
             await inputCharacteristic.writeValueWithoutResponse(payload);
         } else {
-            await inputCharacteristic.writeValue(payload);
+            throw new Error('Характеристика не поддерживает запись');
         }
+        txCount += 1;
+        const signedM1 = clampMotor(left);
+        const signedM2 = clampMotor(right);
+        txStatus.textContent = `Отправка #${txCount}: M1=${signedM1} M2=${signedM2} [${payload[0]}, ${payload[1]}]`;
     } catch (error) {
         console.error('Ошибка записи команды моторов:', error);
         statusDiv.textContent = 'Ошибка отправки: ' + error.message;
+        txStatus.textContent = 'Отправка не удалась: ' + error.message;
     } finally {
         writeInFlight = false;
         if (pendingPayload) {
             const next = pendingPayload;
             pendingPayload = null;
-            sendMotorCommand(next[0], next[1]);
+            const nextM1 = next[0] > 127 ? next[0] - 256 : next[0];
+            const nextM2 = next[1] > 127 ? next[1] - 256 : next[1];
+            sendMotorCommand(nextM1, nextM2);
         }
     }
 }
@@ -167,6 +250,7 @@ async function connectDevice() {
         await initInputCharacteristic();
 
         if (inputCharacteristic) {
+            txCount = 0;
             resetMotorUi();
             setControlsEnabled(true);
             startSendLoop();
@@ -206,6 +290,7 @@ function onDisconnected() {
     connectBtn.disabled = false;
     resetMotorUi();
     statusDiv.textContent = 'Статус: отключено';
+    txStatus.textContent = 'Отправка: нет соединения';
 }
 
 async function readDIS() {

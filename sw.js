@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v1-rover';
+const CACHE_VERSION = 'v3-rover';
 const CACHE_NAME = `myo-rover-cache-${CACHE_VERSION}`;
 const urlsToCache = [
     './',
